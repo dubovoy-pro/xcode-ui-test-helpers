@@ -1,6 +1,9 @@
 import XCTest
 
 
+// MARK: Helpers
+
+
 /// Все вспомогательные методы исходят из условия, что на устойстве
 /// или симуляторе установлена русская локаль.
 
@@ -183,4 +186,90 @@ func oneOfWaiter(elements: [XCUIElement], timeout: TimeInterval) -> XCUIElement?
         Thread.sleep(forTimeInterval: step)
     }
     return nil
+}
+
+
+// MARK: Examples
+
+/// Пример демонстрирует работу хелпера oneOfWaiter
+///
+func alertsOneOfExample() {
+    
+    let appName = "MY_COOL_APP"
+    
+    let app = XCUIApplication()
+    
+    // MARK: удаляем приложение с предыдущего теста (сбрасываем разрешения)
+
+    deleteApp()
+    
+    // MARK: запускаем приложение
+
+    app.launch()
+    
+    
+    // MARK: обрабатываем алерт трекинга
+
+    let trackingElements = makeAlertElements(alertTitle: "Разрешить приложению «\(appName)» отслеживать Ваши действия в приложениях и на веб-сайтах других компаний?")
+    
+    guard let alert = oneOfWaiter(elements: trackingElements, timeout: 3) else {
+        XCTFail("Alert not found!")
+        return
+    }
+
+    alert.buttons["Попросить не отслеживать"].tap()
+
+    
+    // MARK: Ожидаем появления формы входа, вводим номер телефона
+
+    let phoneField = XCUIApplication().textFields["field_phone"]
+
+    wait(for: [makeExistsExpectation(phoneField)], timeout: 5)
+            
+    phoneField.typeText("9")
+    phoneField.typeText("5")
+    phoneField.typeText("1")
+    phoneField.typeText("0")
+    phoneField.typeText("0")
+    phoneField.typeText("5")
+    phoneField.typeText("0")
+    phoneField.typeText("4")
+    phoneField.typeText("1")
+    phoneField.typeText("2")
+
+    let getSmsButton = XCUIApplication().buttons["button_enter"]
+    getSmsButton.tap()
+
+    
+    // MARK: обрабатываем алерты геопозиции и пуш-уведомлений (порядок появления рандомный)
+
+    let pushElementsSimulator = makeAlertElements(alertTitle: "“\(appName)” Would Like to Send You Notifications")
+    let pushElementsDevice = makeAlertElements(alertTitle: "Приложение «\(appName)» запрашивает разрешение на отправку Вам уведомлений.")
+    let geoElements = makeAlertElements(alertTitle: "Разрешить приложению «\(appName)» использовать Вашу геопозицию?")
+
+    let allElements =
+    geoElements +
+    pushElementsSimulator +
+    pushElementsDevice
+    
+    for _ in 1...2 { // 2 алерта, потому 2 итерации цикла
+        guard let alert = oneOfWaiter(elements: allElements, timeout: 3) else {
+            XCTFail("Alert not found!")
+            return
+        }
+        
+        if geoElements.contains(alert) {
+            alert.buttons["При использовании"].tap()
+            continue
+        }
+        if pushElementsSimulator.contains(alert) {
+            alert.buttons["Allow"].tap()
+            continue
+        }
+        if pushElementsDevice.contains(alert) {
+            alert.buttons["Разрешить"].tap()
+            continue
+        }
+    }
+    
 }
